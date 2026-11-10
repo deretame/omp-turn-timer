@@ -1,7 +1,5 @@
 import { appendFileSync } from "node:fs";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-// Host-provided subpath: omp resolves it at runtime, so it is not a plugin dependency.
-import { lookup } from "@oh-my-pi/pi-coding-agent/config/registry";
 
 const TURN_TYPE = "omp-turn-timer";
 const LOG = process.env.OMP_TURN_TIMER_LOG;
@@ -104,26 +102,13 @@ export default function turnTimer(pi: ExtensionAPI) {
 	// ---- per-block timing ----
 	const liveThinking = new Map<number, Timing>();
 	const finishedThinking = new Map<string, Timing>();
-	const tools = new Map<string, { start: number; end?: number; name: string }>();
 
 	const reset = () => {
 		runStart = undefined;
 		footerToken++;
 		liveThinking.clear();
 		finishedThinking.clear();
-		tools.clear();
 	};
-
-	// Enable the opt-in presenter surface unless the user configured it.
-	try {
-		const setting = lookup("extensionRenderers.transcriptPresenters");
-		if (setting && !setting.isConfigured(pi.pi.settings)) {
-			setting.override(pi.pi.settings, true);
-			log("overrode extensionRenderers.transcriptPresenters=true");
-		}
-	} catch (err) {
-		log(`settings override skipped: ${String(err)}`);
-	}
 
 	pi.on("session_start", () => {
 		reset();
@@ -197,44 +182,6 @@ export default function turnTimer(pi: ExtensionAPI) {
 			? `⏱ ${clock(timing.start)} → ${clock(end)} · ${fmtDuration(end - timing.start)}`
 			: `⏱ ${clock(timing.start)} → …`;
 		return new TimerLine(line, s => theme.fg("dim", s));
-	});
-
-	// ---- tool timing ----
-	pi.on("tool_execution_start", event => {
-		tools.set(event.toolCallId, { start: Date.now(), name: event.toolName });
-	});
-
-	pi.on("tool_execution_end", event => {
-		const timing = tools.get(event.toolCallId);
-		if (timing) timing.end = Date.now();
-	});
-
-	const toolHint = (block: { toolName: string; args?: unknown }): string => {
-		const args = block.args;
-		if (block.toolName === "bash" && args && typeof args === "object" && "command" in args && typeof args.command === "string") {
-			const first = args.command.split(/\r?\n/, 1)[0]?.trim() ?? "";
-			return first.length > 60 ? `${first.slice(0, 59)}…` : first;
-		}
-		if (block.toolName === "eval" && args && typeof args === "object" && "language" in args && typeof args.language === "string") {
-			return args.language;
-		}
-		if (block.toolName === "eval") return "js";
-		return "";
-	};
-
-	pi.registerTranscriptPresenter(block => {
-		if (block.type !== "toolCall") return undefined;
-		if (block.toolName !== "bash" && block.toolName !== "eval") return undefined;
-		const timing = tools.get(block.id);
-		if (!timing) return undefined;
-		const end = timing.end;
-		const status = block.isError ? "✗" : block.isPartial || end === undefined ? "…" : "✓";
-		const hint = toolHint(block);
-		const label = `${status} ${block.toolName}${hint ? ` · ${hint}` : ""} · ${fmtDuration((end ?? Date.now()) - timing.start)}`;
-		const rows = [
-			end ? `⏱ ${clock(timing.start)} → ${clock(end)}` : `⏱ ${clock(timing.start)} → …`,
-		];
-		return { compact: { label, rows } };
 	});
 
 	// ---- turn footer ----
