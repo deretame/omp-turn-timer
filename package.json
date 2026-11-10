@@ -1,0 +1,12 @@
+{
+  "name": "omp-turn-timer",
+  "version": "0.1.0",
+  "description": "Show turn end time, elapsed time, and per-block start/end timings in Oh My Pi",
+  "type": "module",
+  "license": "MIT",
+  "files": ["src"],
+  "keywords": ["oh-my-pi", "omp", "timing", "tui"],
+  "omp": {
+    "extensions": ["./src/index.ts"]
+  }
+}
