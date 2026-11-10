@@ -253,6 +253,8 @@ export default function turnTimer(pi: ExtensionAPI) {
 		let thinkingBlocks = 0;
 		for (const message of event.messages) {
 			if (message.role !== "assistant") continue;
+			// agent_end carries the whole session; only count messages from this run.
+			if (message.timestamp < start) continue;
 			for (const part of message.content) {
 				if (part.type === "toolCall") toolCalls++;
 				else if (part.type === "thinking") thinkingBlocks++;
